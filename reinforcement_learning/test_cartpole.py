@@ -4,7 +4,7 @@ import gym
 import json
 from agent.dqn_agent import DQNAgent
 from train_cartpole import run_episode
-from agent.networks import *
+from agent.networks import MLP
 import numpy as np
 
 np.random.seed(0)
@@ -15,9 +15,13 @@ if __name__ == "__main__":
 
     # TODO: load DQN agent
     # ...
-    Q_target = MLP(env)
-    agent = DQNAgent()
+    states_dim = 4
+    action_dim = 1
 
+    Q = MLP(states_dim, action_dim)
+    Q_target = MLP(states_dim, action_dim)
+    agent = DQNAgent(Q, Q_target, action_dim, double=False)
+    agent.load("./../models_cartpole/dqn_agent.pt")
     n_test_episodes = 15
 
     episode_rewards = []
