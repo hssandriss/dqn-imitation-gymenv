@@ -109,7 +109,7 @@ class DQNAgent:
         #      2.3 call soft update for target network
         soft_update(self.Q_target, self.Q, self.tau)
 
-    def act(self, state, deterministic):
+    def act(self, state, deterministic, race):
         """
         This method creates an epsilon-greedy policy based on the Q-function approximator and epsilon (probability to select a random action)
         Args:
@@ -132,8 +132,14 @@ class DQNAgent:
             # You can sample the agents actions with different probabilities (need to sum up to 1) so that the agent will prefer to accelerate or going straight.
             # To see how the agent explores, turn the rendering in the training on and look what the agent is doing.
             # action_id = ...
-            action_id = np.random.randint(0, self.num_actions)
-
+            if race:
+                p = np.random.uniform()
+                if p < 0.5:
+                    action_id = 3
+                else:
+                    action_id = np.random.randint(0, self.num_actions)
+            else:
+                action_id = np.random.randint(0, self.num_actions)
         return action_id
 
     def save(self, file_name):

@@ -28,45 +28,30 @@ Car Racing Network
 
 class CNN(nn.Module):
 
-    def __init__(self, num_actions):
+    def __init__(self, hist_size, num_actions):
         super(CNN, self).__init__()
-
-        self.conv1 = nn.Sequential(
-            nn.Conv2d(4, 32, kernel_size=8, stride=4),
-            nn.ReLU()
-        )
-        self.conv2 = nn.Sequential(
-            nn.Conv2d(32, 64, kernel_size=4, stride=2),
-            nn.ReLU()
-        )
-        self.conv3 = nn.Sequential(
-            nn.Conv2d(64, 64, kernel_size=3, stride=1),
-            nn.ReLU()
-        )
-        self.hidden1 = nn.Sequential(
-            nn.Linear(64 * 7 * 7, 512),
-            nn.ReLU()
-        )
-
-        self.hidden2 = nn.Sequential(
-            nn.Linear(512, 128),
-            nn.ReLU()
-        )
-
-        self.out = nn.Sequential(
-            nn.Linear(128, num_actions)
-        )
-        # # Init with cuda if available
-        # if torch.cuda.is_available():
-        #     self.cuda()
-        # self.apply(self.weights_init)
+        self.relu = nn.ReLU()
+        self.conv1 = nn.Conv2d(hist_size, 32, kernel_size=8, stride=4)
+        self.bn1 = nn.BatchNorm2d(32)
+        self.conv2 = nn.Conv2d(32, 64, kernel_size=5, stride=2)
+        self.bn2 = nn.BatchNorm2d(64)
+        self.conv3 = nn.Conv2d(64, 64, kernel_size=3, stride=1)
+        self.bn3 = nn.BatchNorm2d(64)
+        self.dense = nn.Linear(64*8*8, 512)
+        self.out = nn.Linear(512, num_actions)
 
     def forward(self, x):
         x = self.conv1(x)
+        x = self.bn1(x)
+        x = self.relu(x)
         x = self.conv2(x)
+        x = self.bn2(x)
+        x = self.relu(x)
         x = self.conv3(x)
-        x = x.view(x.size(0), -1)
-        x = self.hidden1(x)
-        x = self.hidden2(x)
+        x = self.bn3(x)
+        x = self.relu(x)
+        x = x.view(x.shape[0], -1)
+        x = self.dense(x)
+        x = self.relu(x)
         x = self.out(x)
         return x
