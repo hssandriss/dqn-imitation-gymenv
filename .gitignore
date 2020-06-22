@@ -1,3 +1,12 @@
 venv_rl
 gym
-.vscode
+.vscode/
+models
+tensorboard
+tensorboard_imitation
+results
+models_cartpole
+models_carracing
+data
+requirements.txt
+*.pyc
