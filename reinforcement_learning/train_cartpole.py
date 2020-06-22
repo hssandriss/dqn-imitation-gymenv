@@ -24,7 +24,7 @@ def run_episode(env, agent, deterministic, do_training=True, rendering=True, max
     step = 0
     while True:
 
-        action_id = agent.act(state=state, deterministic=deterministic)
+        action_id = agent.act(state=state, race=False, deterministic=deterministic)
         next_state, reward, terminal, info = env.step(action_id)
 
         if do_training:
@@ -52,17 +52,17 @@ def train_online(env, agent, num_episodes, num_eval_episodes, eval_cycle, model_
     print("... train agent")
 
     tensorboard_train = Evaluation(os.path.join(tensorboard_dir, "train"), "train", [
-                                   "episode_reward", "episode_length", "a_0", "a_1"])
+                                   "episode_reward_train", "episode_length_train", "a_0", "a_1"])
     tensorboard_eval = Evaluation(os.path.join(tensorboard_dir, "eval"), "eval",
-                                  ["episode_reward", "episode_length"])
+                                  ["episode_reward_valid", "episode_length_valid"])
     # training
     for i in range(num_episodes):
         # if i % 500 == 0 and i != 0:
         print("training episode: ", i)
         stats = run_episode(env, agent, deterministic=False, rendering=True,  do_training=True)
         print(stats.episode_reward)
-        tensorboard_train.write_episode_data(i, eval_dict={"episode_reward": stats.episode_reward,
-                                                           "episode_length": len(stats.actions_ids),
+        tensorboard_train.write_episode_data(i, eval_dict={"episode_reward_train": stats.episode_reward,
+                                                           "episode_length_train": len(stats.actions_ids),
                                                            "a_0": stats.get_action_usage(0),
                                                            "a_1": stats.get_action_usage(1)})
 
@@ -71,13 +71,16 @@ def train_online(env, agent, num_episodes, num_eval_episodes, eval_cycle, model_
         # ...
         # print(stats.episode_reward)
         if i % eval_cycle == 0:
+            cumreward = 0.
+            cumlength = 0.
             for j in range(num_eval_episodes):
                 # print("evaluation episode", j)
                 stats = run_episode(env, agent, deterministic=True, rendering=True, do_training=False)
-                print(stats.episode_reward)
-                tensorboard_eval.write_episode_data(
-                    j, eval_dict={"episode_reward": stats.episode_reward,
-                                  "episode_length": len(stats.actions_ids), })
+                cumreward += stats.episode_reward
+                cumlength += len(stats.actions_ids)
+            tensorboard_eval.write_episode_data(
+                i, eval_dict={"episode_reward_valid": cumreward/num_eval_episodes,
+                              "episode_length_valid": cumlength/num_eval_episodes})
 
         # store model.
         if i % eval_cycle == 0 or i >= (num_episodes - 1):
@@ -90,8 +93,8 @@ def train_online(env, agent, num_episodes, num_eval_episodes, eval_cycle, model_
 if __name__ == "__main__":
 
     num_eval_episodes = 5   # evaluate on 5 episodes
-    eval_cycle = 100       # evaluate every 10 episodes
-    num_episodes = 20000
+    eval_cycle = 10       # evaluate every 10 episodes
+    num_episodes = 10000
     # You find information about cartpole in
     # https://github.com/openai/gym/wiki/CartPole-v0
     # Hint: CartPole is considered solved when the average reward is greater than or equal to 195.0 over 100 consecutive trials.

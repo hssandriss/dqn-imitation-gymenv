@@ -25,11 +25,11 @@ class ReplayBuffer:
         self._data.rewards.append(reward)
         self._data.dones.append(done)
         if len(self._data.states) % self.history_length == 0:
-            self._data.states.pop(0)
-            self._data.actions.pop(0)
-            self._data.next_states.pop(0)
-            self._data.rewards.pop(0)
-            self._data.dones.pop(0)
+            self._data.states.pop(self.history_length * 0.01)
+            self._data.actions.pop(self.history_length * 0.01)
+            self._data.next_states.pop(self.history_length * 0.01)
+            self._data.rewards.pop(self.history_length * 0.01)
+            self._data.dones.pop(self.history_length * 0.01)
 
     def next_batch(self, batch_size):
         """

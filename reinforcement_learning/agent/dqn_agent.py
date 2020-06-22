@@ -13,7 +13,7 @@ def soft_update(target, source, tau):
 
 class DQNAgent:
 
-    def __init__(self, Q, Q_target, num_actions, double=False, gamma=0.95, batch_size=64, epsilon=0.1, tau=0.01, lr=1e-4, history_length=0):
+    def __init__(self, Q, Q_target, num_actions, double=False, gamma=0.95, batch_size=64, epsilon=0.9, tau=0.01, lr=1e-4, history_length=0):
         """
          Q-Learning agent for off-policy TD control using Function Approximation.
          Finds the optimal greedy policy while following an epsilon-greedy policy.
@@ -37,6 +37,8 @@ class DQNAgent:
         self.replay_buffer = ReplayBuffer(history_length)
 
         # parameters
+        self.double = double
+        self.num_actions = num_actions
         self.batch_size = batch_size
         self.gamma = gamma
         self.tau = tau
@@ -44,8 +46,7 @@ class DQNAgent:
 
         self.loss_function = torch.nn.MSELoss()
         self.optimizer = optim.Adam(self.Q.parameters(), lr=lr)
-        self.double = double
-        self.num_actions = num_actions
+        # self.scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0, T_mult)
 
     def train(self, state, action, next_state, reward, terminal):
         """
@@ -70,7 +71,7 @@ class DQNAgent:
             # DQN
             self.Q_target.eval()
             with torch.no_grad():
-                target_state_action_values = self.Q_target(batch_next_states)
+                target_state_action_values = self.Q_target(batch_next_states).detach()
                 td_target = batch_rewards + (1-batch_dones) * self.gamma * \
                     torch.max(target_state_action_values, 1)[0].unsqueeze(1)
 
@@ -80,8 +81,8 @@ class DQNAgent:
             loss = self.loss_function(td_target, state_action_values)
             #      2.2 update the Q network
             loss.backward()
-            # for param in self.Q.parameters():
-            #     param.grad.data.clamp_(-1, 1)
+            for param in self.Q.parameters():
+                param.grad.data.clamp_(-1, 1)
             self.optimizer.step()
         else:
             # DDQN
@@ -89,7 +90,7 @@ class DQNAgent:
             with torch.no_grad():
                 model_state_action_values = self.Q(batch_next_states)
                 target_actions = torch.max(model_state_action_values, 1)[1].unsqueeze(1)
-                batch_target_values = self.Q_target(batch_next_states).gather(1, target_actions.long())
+                batch_target_values = self.Q_target(batch_next_states).gather(1, target_actions.long()).detach()
                 td_target = batch_rewards + (1-batch_dones) * self.gamma * batch_target_values
 
             self.Q.train()
@@ -98,8 +99,8 @@ class DQNAgent:
             loss = self.loss_function(td_target, state_action_values)
             #      2.2 update the Q network
             loss.backward()
-            # for param in self.Q.parameters():
-            #     param.grad.data.clamp_(-1, 1)
+            for param in self.Q.parameters():
+                param.grad.data.clamp_(-1, 1)
             self.optimizer.step()
 
         for name, param in self.Q.named_parameters():
@@ -118,6 +119,8 @@ class DQNAgent:
         Returns:
             action id
         """
+        # Epsilon decay
+        self.epsilon = max(self.epsilon * 0.995, 0.05)
         r = np.random.uniform()
         # self.Q.eval()
         state = torch.Tensor(state).unsqueeze(0).cuda()
@@ -133,11 +136,7 @@ class DQNAgent:
             # To see how the agent explores, turn the rendering in the training on and look what the agent is doing.
             # action_id = ...
             if race:
-                p = np.random.uniform()
-                if p < 0.5:
-                    action_id = 3
-                else:
-                    action_id = np.random.randint(0, self.num_actions)
+                action_id = np.random.choice([0, 1, 2, 3, 4], p=[0.2, 0.1, 0.1, 0.5, 0.1])
             else:
                 action_id = np.random.randint(0, self.num_actions)
         return action_id
