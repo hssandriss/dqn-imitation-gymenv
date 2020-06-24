@@ -28,7 +28,7 @@ def run_episode(env, agent, history_size=1, rendering=False, max_timesteps=1000)
     while True:
         # TODO: preprocess the state in the same way than in your preprocessing in train_agent.py
         #    state = ...
-        state_input = torch.FloatTensor(state).unsqueeze(0)
+        state_input = torch.FloatTensor(state).unsqueeze(0).cuda()
         # TODO: get the action from your agent! You need to transform the discretized actions to continuous
         # actions.
         # hints:

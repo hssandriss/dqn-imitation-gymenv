@@ -55,13 +55,13 @@ def preprocessing(X_train, y_train, X_valid, y_valid, history_length=1):
     X_train, y_train = data_balance(X_train, y_train, 0.3, 0)
     X_train, y_train = data_balance(X_train, y_train, 0.5, 1)
     print(label_proportions(y_train))
-    print("Continue (y/n) ?")
-    s = input()
-    while s not in ('y', 'n'):
-        print("Continue (y/n) ?")
-        s = input()
-    checked_balance = (s == 'y')
-    assert checked_balance
+    # print("Continue (y/n) ?")
+    # s = input()
+    # while s not in ('y', 'n'):
+    #     print("Continue (y/n) ?")
+    #     s = input()
+    # checked_balance = (s == 'y')
+    # assert checked_balance
 
     X_train = np.expand_dims(X_train, 3)
     X_valid = np.expand_dims(X_valid, 3)
@@ -141,11 +141,11 @@ def train_model(X_train, y_train, X_valid, y_valid, history_length, n_minibatche
             # compute training/ validation accuracy and write it to tensorboard
             train_y_pred = agent.predict(X)
             train_act_pred = torch.argmax(train_y_pred, 1)
-            train_acc = (train_act_pred == torch.LongTensor(y)).sum().item()/train_act_pred.shape[0]
+            train_acc = (train_act_pred == torch.LongTensor(y).cuda()).sum().item()/train_act_pred.shape[0]
             # val acc
             valid_y_pred = agent.predict(X_valid)
             valid_act_pred = torch.argmax(valid_y_pred, 1)
-            val_acc = (valid_act_pred == torch.LongTensor(y_valid)).sum().item()/valid_act_pred.shape[0]
+            val_acc = (valid_act_pred == torch.LongTensor(y_valid).cuda()).sum().item()/valid_act_pred.shape[0]
             # Printing values to stdout
             print("Iter %i loss %.3f train_acc %.3f val_acc %.3f" % (i, train_loss, train_acc, val_acc))
 
