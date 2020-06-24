@@ -56,7 +56,6 @@ def data_balance(X, y, p, action):
     idx_others = np.where(y != action)[0]
     mask = np.where(np.random.rand(idx_straight.shape[0]) <= p)[0]
     idx_kept = idx_straight[mask]
-    # print(idx_kept.shape, idx_others.shape)
     idx_kept = np.hstack((idx_kept, idx_others))
     return X[idx_kept], y[idx_kept]
 

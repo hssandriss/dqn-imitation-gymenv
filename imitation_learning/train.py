@@ -18,7 +18,7 @@ def read_data(datasets_dir="./data", frac=0.1):
     and splits it into training/ validation set.
     """
     print("... read data")
-    data_file = os.path.join(datasets_dir, 'data.pkl.gzip')
+    data_file = os.path.join(datasets_dir, 'data_fine.pkl.gzip')
 
     f = gzip.open(data_file, 'rb')
     data = pickle.load(f)
@@ -34,22 +34,48 @@ def read_data(datasets_dir="./data", frac=0.1):
     return X_train, y_train, X_valid, y_valid
 
 
+def label_proportions(y):
+    count = []
+    for a in range(5):
+        count.append(str(a) + ": " + str(np.where((y == a))[0].shape[0]))
+    return " ".join(count)
+
+
 def preprocessing(X_train, y_train, X_valid, y_valid, history_length=1):
 
     # TODO: preprocess your data here.
     # 1. convert the images in X_train/X_valid to gray scale. If you use rgb2gray() from utils.py, the output shape (96, 96, 1)
     # 2. you can train your model with discrete actions (as you get them from read_data) by discretizing the action space
     #    using action_to_id() from utils.py.
-    X_train = rgb2gray(X_train).reshape(96, 96)/255.0
-    X_valid = rgb2gray(X_valid).reshape(96, 96)/255.0
+    X_train = rgb2gray(X_train).reshape(-1, 96, 96)/255.0
+    X_valid = rgb2gray(X_valid).reshape(-1, 96, 96)/255.0
     y_train = np.apply_along_axis(action_to_id, 1, y_train)
     y_valid = np.apply_along_axis(action_to_id, 1, y_valid)
-    data_balance(X_train, y_train, 0.5, 0)
+    print(label_proportions(y_train))
+    X_train, y_train = data_balance(X_train, y_train, 0.3, 0)
+    X_train, y_train = data_balance(X_train, y_train, 0.5, 1)
+    print(label_proportions(y_train))
+    print("Continue (y/n) ?")
+    s = input()
+    while s not in ('y', 'n'):
+        print("Continue (y/n) ?")
+        s = input()
+    checked_balance = (s == 'y')
+    assert checked_balance
+
+    X_train = np.expand_dims(X_train, 3)
+    X_valid = np.expand_dims(X_valid, 3)
+    # y_train = np.expand_dims(y_train, 1)
+    # y_valid = np.expand_dims(y_valid, 1)
+
+    print(X_train.shape, X_valid.shape)
+    print(y_train.shape, y_valid.shape)
+
     # History:
     # At first you should only use the current image as input to your network to learn the next action. Then the input states
     # have shape (96, 96, 1). Later, add a history of the last N images to your state so that a state has shape (96, 96, N).
     if history_length > 1:
-        # History Xtrain
+        # History X_train
         X_train_hist = []
         for i in range(X_train.shape[0]):
             state = []
@@ -61,10 +87,10 @@ def preprocessing(X_train, y_train, X_valid, y_valid, history_length=1):
             else:
                 for j in range(history_length):
                     state.append(X_train[i-j])
-            state = np.stack(state, axis=2)
-            X_train_hist.append(np.array(state))
-        X_train = np.stack(X_train_hist)
-        # History Xvalid
+            state = np.concatenate(state, axis=2)
+            X_train_hist.append(state)
+        X_train = np.stack(X_train_hist, axis=0)
+        # History X_valid
         X_valid_hist = []
         for i in range(X_valid.shape[0]):
             state = []
@@ -76,9 +102,12 @@ def preprocessing(X_train, y_train, X_valid, y_valid, history_length=1):
             else:
                 for j in range(history_length):
                     state.append(X_valid[i-j])
-            state = np.stack(state, axis=2)
-            X_valid_hist.append(np.array(state))
-        X_valid = np.stack(X_valid_hist)
+            state = np.concatenate(state, axis=2)
+            X_valid_hist.append(state)
+        X_valid = np.stack(X_valid_hist, axis=0)
+
+    print(X_train.shape, X_valid.shape)  # B x W x H x C
+    print(y_train.shape, y_valid.shape)  # B
 
     return X_train, y_train, X_valid, y_valid
 
@@ -96,7 +125,6 @@ def train_model(X_train, y_train, X_valid, y_valid, history_length, n_minibatche
     agent = BCAgent(history_length)
     tensorboard = Evaluation(os.path.join(tensorboard_dir, "train"), "train", [
         "train_loss", "train_accuracy", "validation_accuracy"])
-
     # TODO: implement the training
     #
     # 1. write a method sample_minibatch and perform an update step
@@ -104,44 +132,36 @@ def train_model(X_train, y_train, X_valid, y_valid, history_length, n_minibatche
     #    your training *during* the training in your web browser
     #
     # training loop
-
-    # print(X_train.shape, y_train.shape)
-    # print(X_valid.shape, y_valid.shape)
-    if history_length > 1:
-        X_valid = torch.FloatTensor(X_valid).permute(0, 3, 1, 2).cuda()
-        y_valid = torch.LongTensor(y_valid).cuda()
-    else:
-        X_valid = torch.FloatTensor(X_valid).unsqueeze(1).cuda()
-        y_valid = torch.LongTensor(y_valid).cuda()
+    idx_sampler = np.arange(X_train.shape[0])
+    np.random.shuffle(idx_sampler)
     for i in range(n_minibatches):
-        minibatch_indices = np.random.choice(X_train.shape[0], batch_size)
-        y = y_train[minibatch_indices]
-        X = X_train[minibatch_indices]
-        if history_length > 1:
-            X = torch.FloatTensor(X).permute(0, 3, 1, 2).cuda()
-            y = torch.LongTensor(y).cuda()
-        else:
-            X = torch.FloatTensor(X).unsqueeze(1).cuda()
-            y = torch.LongTensor(y).cuda()
-        # print(X.shape)
+        X, y = sample_minibatch(idx_sampler, X_train, y_train, i, batch_size)
         train_loss = agent.update(X, y)
         if i % 10 == 0:
             # compute training/ validation accuracy and write it to tensorboard
-            y_pred = agent.predict(X)
-            _, act_pred = torch.max(y_pred.data, 1)
-            train_acc = (act_pred == y).sum().item()/y_pred.shape[0]
+            train_y_pred = agent.predict(X)
+            train_act_pred = torch.argmax(train_y_pred, 1)
+            train_acc = (train_act_pred == torch.LongTensor(y)).sum().item()/train_act_pred.shape[0]
             # val acc
-            y_pred = agent.predict(X_valid)
-            _, act_pred = torch.max(y_pred.data, 1)
-            val_acc = (act_pred == y_valid).sum().item()/y_pred.shape[0]
+            valid_y_pred = agent.predict(X_valid)
+            valid_act_pred = torch.argmax(valid_y_pred, 1)
+            val_acc = (valid_act_pred == torch.LongTensor(y_valid)).sum().item()/valid_act_pred.shape[0]
+            # Printing values to stdout
             print("Iter %i loss %.3f train_acc %.3f val_acc %.3f" % (i, train_loss, train_acc, val_acc))
+
             tensorboard.write_episode_data(i, eval_dict={"train_loss": train_loss,
                                                          "train_accuracy": train_acc,
                                                          "validation_accuracy": val_acc})
-            agent.save(os.path.join(model_dir, "agent_%i.pt" % (i)))
+    agent.save(os.path.join(model_dir, "agent.pt"))
+    print("Model saved in file: %s" % "agent.pt")
     # TODO: save your agent
     # model_dir = agent.save(os.path.join(model_dir, "agent.pt"))
     # print("Model saved in file: %s" % model_dir)
+
+
+def sample_minibatch(idx_sampler, X, y, i, batch_size):
+    indices = idx_sampler[i: i + batch_size]
+    return X[indices], y[indices]
 
 
 if __name__ == "__main__":

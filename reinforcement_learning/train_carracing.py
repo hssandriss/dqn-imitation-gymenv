@@ -149,5 +149,6 @@ if __name__ == "__main__":
     Q = CNN(hist+1, num_actions)
     # 2. init DQNAgent (see dqn/dqn_agent.py)
     agent = DQNAgent(Q, Q_target, num_actions, double=False, history_length=1e6)
+    # agent = DQNAgent(Q, Q_target, num_actions, double=False, epsilon = 0.99, eps_decay = True, history_length=1e6)
     # 3. train DQN agent with train_online(...)
     train_online(env, agent, num_episodes=1000, history_length=hist, model_dir="./models_carracing")

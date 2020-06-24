@@ -12,20 +12,23 @@ import sys
 sys.path.append("../")
 
 
-def run_episode(env, agent, history_size=1, rendering=True, max_timesteps=1000):
+def run_episode(env, agent, history_size=1, rendering=False, max_timesteps=1000):
 
     episode_reward = 0
     step = 0
     # fix bug of curropted states without rendering in racingcar gym environment
-    # env.viewer.window.dispatch_events()
+    env.viewer.window.dispatch_events()
     state = env.reset()
     state = rgb2gray(state).reshape(96, 96) / 255.0
+
+    state = np.expand_dims(state, 2)
     if history_size > 1:
-        state = np.stack([state]*history_length, axis=2)
+        state = np.concatenate([state]*history_length, axis=2)
+    # state = np.expand_dims(state, 0)
     while True:
         # TODO: preprocess the state in the same way than in your preprocessing in train_agent.py
         #    state = ...
-        state_input = torch.FloatTensor(state).unsqueeze(0).permute(0, 3, 1, 2).cuda()
+        state_input = torch.FloatTensor(state).unsqueeze(0)
         # TODO: get the action from your agent! You need to transform the discretized actions to continuous
         # actions.
         # hints:
@@ -33,10 +36,9 @@ def run_episode(env, agent, history_size=1, rendering=True, max_timesteps=1000):
         #       - just in case your agent misses the first turn because it is too fast: you are allowed to clip the acceleration in test_agent.py
         #       - you can use the softmax output to calculate the amount of lateral acceleration
         # a = ...
-        print(state_input.shape)
         a = agent.predict(state_input)
-        _, a = torch.max(a, 1)
-        a = id_to_action(a.item())
+        a = torch.argmax(a, 1).item()
+        a = id_to_action(a)
         next_state, r, done, info = env.step(a)
         episode_reward += r
         next_state = rgb2gray(next_state).reshape(96, 96, 1) / 255.0
@@ -57,7 +59,7 @@ if __name__ == "__main__":
 
     # important: don't set rendering to False for evaluation (you may get corrupted state images from gym)
     rendering = True
-    path_model = "models/agent_990.pt"
+    path_model = "models/agent.pt"
     history_length = 5
     n_test_episodes = 15                  # number of episodes to test
 

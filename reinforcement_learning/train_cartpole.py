@@ -56,6 +56,7 @@ def train_online(env, agent, num_episodes, num_eval_episodes, eval_cycle, model_
     tensorboard_eval = Evaluation(os.path.join(tensorboard_dir, "eval"), "eval",
                                   ["episode_reward_valid", "episode_length_valid"])
     # training
+    early = 3
     for i in range(num_episodes):
         # if i % 500 == 0 and i != 0:
         print("training episode: ", i)
@@ -81,10 +82,15 @@ def train_online(env, agent, num_episodes, num_eval_episodes, eval_cycle, model_
             tensorboard_eval.write_episode_data(
                 i, eval_dict={"episode_reward_valid": cumreward/num_eval_episodes,
                               "episode_length_valid": cumlength/num_eval_episodes})
+            if cumreward/num_eval_episodes >= 950:
+                print("Saving model ...")
+                agent.save(os.path.join(model_dir, "dqn_agent_fixed_decay.pt"))
+                early -= 1
+                if not early:
+                    break
 
-        # store model.
-        if i % eval_cycle == 0 or i >= (num_episodes - 1):
-            agent.save(os.path.join(model_dir, "dqn_agent.pt"))
+        # # store model.
+        # if i % eval_cycle == 0 or i >= (num_episodes - 1):
 
     tensorboard_train.close_session()
     tensorboard_eval.close_session()
@@ -110,6 +116,7 @@ if __name__ == "__main__":
     Q_target = MLP(state_dim, num_actions)
     Q = MLP(state_dim, num_actions)
     # 2. init DQNAgent (see dqn/dqn_agent.py)
-    agent = DQNAgent(Q, Q_target, num_actions, double=True, history_length=1e6)
+    # agent = DQNAgent(Q, Q_target, num_actions, double=True, history_length=1e6)
+    agent = DQNAgent(Q, Q_target, num_actions, double=True, epsilon=0.99, eps_decay=True, history_length=1e6)
     # 3. train DQN agent with train_online(...)
     train_online(env, agent, num_episodes, num_eval_episodes, eval_cycle)

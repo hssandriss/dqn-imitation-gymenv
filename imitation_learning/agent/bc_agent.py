@@ -9,7 +9,7 @@ class BCAgent:
         # self.net = CNN(...)
         self.history_size = history_size
         self.num_actions = n_actions
-        self.net = CNN(self.history_size, n_actions).cuda()
+        self.net = CNN(self.history_size, n_actions)
         self.lr = lr
         self.criterion = torch.nn.CrossEntropyLoss()
         self.optimizer = torch.optim.Adam(self.net.parameters(), lr=lr)
@@ -17,8 +17,11 @@ class BCAgent:
     def update(self, X_batch, y_batch):
         # TODO: transform input to tensors
         # TODO: forward + backward + optimize
-        self.net.train()
+        X_batch = torch.FloatTensor(X_batch).permute(0, 3, 1, 2)
+        y_batch = torch.LongTensor(y_batch)
+        # print(X_batch.shape, y_batch.shape)
         y_predicted = self.net(X_batch)
+        self.net.train()
         self.optimizer.zero_grad()
         loss = self.criterion(y_predicted, y_batch)
         loss.backward()
@@ -27,6 +30,7 @@ class BCAgent:
 
     def predict(self, X):
         # TODO: forward pass
+        X = torch.FloatTensor(X).permute(0, 3, 1, 2)
         self.net.eval()
         with torch.no_grad():
             outputs = self.net(X)

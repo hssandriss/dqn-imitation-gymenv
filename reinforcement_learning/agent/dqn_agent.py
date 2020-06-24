@@ -13,7 +13,7 @@ def soft_update(target, source, tau):
 
 class DQNAgent:
 
-    def __init__(self, Q, Q_target, num_actions, double=False, gamma=0.95, batch_size=64, epsilon=0.9, tau=0.01, lr=1e-4, history_length=0):
+    def __init__(self, Q, Q_target, num_actions, double=False, gamma=0.95, batch_size=64, epsilon=0.1, eps_decay=False, tau=0.01, lr=1e-4, history_length=0):
         """
          Q-Learning agent for off-policy TD control using Function Approximation.
          Finds the optimal greedy policy while following an epsilon-greedy policy.
@@ -32,10 +32,8 @@ class DQNAgent:
         self.Q = Q.cuda()
         self.Q_target = Q_target.cuda()
         self.Q_target.load_state_dict(self.Q.state_dict())
-
         # define replay buffer
         self.replay_buffer = ReplayBuffer(history_length)
-
         # parameters
         self.double = double
         self.num_actions = num_actions
@@ -43,7 +41,7 @@ class DQNAgent:
         self.gamma = gamma
         self.tau = tau
         self.epsilon = epsilon
-
+        self.eps_decay = eps_decay
         self.loss_function = torch.nn.MSELoss()
         self.optimizer = optim.Adam(self.Q.parameters(), lr=lr)
         # self.scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0, T_mult)
@@ -78,7 +76,7 @@ class DQNAgent:
             self.Q.train()
             state_action_values = self.Q(batch_states).gather(1, batch_actions.long())
             self.optimizer.zero_grad()
-            loss = self.loss_function(td_target, state_action_values)
+            loss = self.loss_function(td_target.detach(), state_action_values)
             #      2.2 update the Q network
             loss.backward()
             for param in self.Q.parameters():
@@ -89,10 +87,9 @@ class DQNAgent:
             self.Q_target.eval()
             with torch.no_grad():
                 model_state_action_values = self.Q(batch_next_states)
-                target_actions = torch.max(model_state_action_values, 1)[1].unsqueeze(1)
+                target_actions = torch.argmax(model_state_action_values, 1).unsqueeze(1)
                 batch_target_values = self.Q_target(batch_next_states).gather(1, target_actions.long()).detach()
                 td_target = batch_rewards + (1-batch_dones) * self.gamma * batch_target_values
-
             self.Q.train()
             state_action_values = self.Q(batch_states).gather(1, batch_actions.long())
             self.optimizer.zero_grad()
@@ -110,7 +107,7 @@ class DQNAgent:
         #      2.3 call soft update for target network
         soft_update(self.Q_target, self.Q, self.tau)
 
-    def act(self, state, deterministic, race):
+    def act(self, state, deterministic, race=False):
         """
         This method creates an epsilon-greedy policy based on the Q-function approximator and epsilon (probability to select a random action)
         Args:
@@ -120,13 +117,15 @@ class DQNAgent:
             action id
         """
         # Epsilon decay
-        self.epsilon = max(self.epsilon * 0.995, 0.05)
+        if self.eps_decay:
+            self.epsilon = max(self.epsilon * 0.995, 0.05)
+        # np.random.seed()
         r = np.random.uniform()
-        # self.Q.eval()
         state = torch.Tensor(state).unsqueeze(0).cuda()
         if deterministic or r > self.epsilon:
             # TODO: take greedy action (argmax)
             # action_id = ...
+            self.Q.eval()
             with torch.no_grad():
                 action_id = torch.argmax(self.Q(state), dim=1).cpu().item()
         else:

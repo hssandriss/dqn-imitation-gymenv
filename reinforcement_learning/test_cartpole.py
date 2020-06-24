@@ -21,7 +21,7 @@ if __name__ == "__main__":
     Q = MLP(states_dim, action_dim)
     Q_target = MLP(states_dim, action_dim)
     agent = DQNAgent(Q, Q_target, action_dim, double=True)
-    agent.load("./models_cartpole/dqn_agent.pt")
+    agent.load("./models_cartpole/dqn_agent_fixed_1.pt")
     n_test_episodes = 15
 
     episode_rewards = []
